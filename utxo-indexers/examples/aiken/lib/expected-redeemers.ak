@@ -8,11 +8,40 @@ fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
   builtin.unconstr_index(script_purpose) != 0
 }
 
-fn drop_n_maker(n: Int) -> fn(List<a>) -> List<a> {
+/// Borrowed from MicroProof's Bullet:
+/// https://github.com/utxo-company/bullet/blob/92d0b4aea1296407fff58cd129705ce67b407dd9/lib/macros.ak#L137-L157
+fn optimized_drop_n_helper(xs: List<a>, n: Int) -> List<a> {
   if n == 0 {
-    identity
+    xs
   } else {
-    fn(list: List<a>) { drop_n_maker(n - 1)(list) |> builtin.tail_list }
+    let n = n - 1
+    let xs = builtin.tail_list(xs)
+    if n == 0 {
+      xs
+    } else {
+      let n = n - 1
+      let xs = builtin.tail_list(xs)
+      if n == 0 {
+        xs
+      } else {
+        builtin.tail_list(xs)
+      }
+    }
+  }
+}
+
+/// Borrowed from MicroProof's Bullet:
+/// https://github.com/utxo-company/bullet/blob/92d0b4aea1296407fff58cd129705ce67b407dd9/lib/macros.ak#L124-L135
+fn optimized_drop_n(xs: List<a>, n: Int) -> List<a> {
+  if n < 4 {
+    optimized_drop_n_helper(xs, n)
+  } else {
+    xs
+      |> builtin.tail_list
+      |> builtin.tail_list
+      |> builtin.tail_list
+      |> builtin.tail_list
+      |> optimized_drop_n(n - 4)
   }
 }
 
@@ -20,10 +49,18 @@ pub fn enforce_n_spend_redeemers(
   redeemers: Pairs<ScriptPurpose, Redeemer>,
   n: Int,
 ) -> Bool {
-  // Since we expect `n` 
-  let last_spend_at_head = redeemers |> drop_n_maker(n - 1)
+  // We know all `Spend` purposes are at the start of the `redeemers` list (as
+  // it's ordered by the redeemer tags, and `Spend` has the smallest), so by
+  // dropping `n - 1` first elements of it, we can validate that the head of the
+  // remaining list **is** a `Spend`, and the head of its tail is NOT a `Spend`.
+  let last_spend_at_head = redeemers |> optimized_drop_n(n - 1)
+
+  // The redeemer pair that we expect to be the last `Spend`.
   let last_spend = last_spend_at_head |> builtin.head_list
+
+  // The list tail which we expect its head not to be a `Spend`.
   let no_spends = last_spend_at_head |> builtin.tail_list
+
   let first_non_spend = no_spends |> builtin.head_list
   and {
     !is_non_spend(last_spend),
