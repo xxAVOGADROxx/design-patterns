@@ -1,4 +1,5 @@
 use aiken/builtin
+use aiken/collection/list
 
 /// Borrowed from MicroProof's Bullet:
 /// https://github.com/utxo-company/bullet/blob/92d0b4aea1296407fff58cd129705ce67b407dd9/lib/macros.ak#L137-L157
@@ -35,6 +36,13 @@ pub fn optimized_drop_n(xs: List<a>, n: Int) -> List<a> {
       |> builtin.tail_list
       |> optimized_drop_n(n - 4)
   }
+}
+
+test success__stdlib_drop_and_at() {
+  let x = ["a", "b", "c", "d", "e", "f", "g", "h", "i"]
+  let y = x |> list.drop(8)
+  let g = x |> list.at(8)
+  y == ["i"] && g == Some("i")
 }
 
 test success__optimized_drop_n() {

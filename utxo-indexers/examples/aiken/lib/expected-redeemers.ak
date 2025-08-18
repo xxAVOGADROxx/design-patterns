@@ -16,7 +16,8 @@ pub fn enforce_n_spend_redeemers(
   // We know all `Spend` purposes are at the start of the `redeemers` list (as
   // it's ordered by the redeemer tags, and `Spend` has the smallest), so by
   // dropping `n - 1` first elements of it, we can validate that the head of the
-  // remaining list **is** a `Spend`, and the head of its tail is NOT a `Spend`.
+  // remaining list **is** a `Spend`, and the head of its tail **is not** a
+  // `Spend`.
   let last_spend_at_head = redeemers |> optimized_drop_n(n - 1)
 
   // The redeemer pair that we expect to be the last `Spend`.
