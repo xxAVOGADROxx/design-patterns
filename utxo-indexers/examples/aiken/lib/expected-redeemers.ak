@@ -1,48 +1,12 @@
 use aiken/builtin
 use cardano/transaction.{Redeemer, ScriptPurpose}
+use utils.{optimized_drop_n}
 
 /// We know the `Spend` constructor of `ScriptPurpose` has a tag of `0` based
 /// on:
 /// https://github.com/IntersectMBO/cardano-ledger/blob/693218df6cd90263da24e6c2118bac420ceea3a1/eras/conway/impl/cddl-files/conway.cddl#L693-L699
 fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
   builtin.unconstr_index(script_purpose) != 0
-}
-
-/// Borrowed from MicroProof's Bullet:
-/// https://github.com/utxo-company/bullet/blob/92d0b4aea1296407fff58cd129705ce67b407dd9/lib/macros.ak#L137-L157
-fn optimized_drop_n_helper(xs: List<a>, n: Int) -> List<a> {
-  if n == 0 {
-    xs
-  } else {
-    let n = n - 1
-    let xs = builtin.tail_list(xs)
-    if n == 0 {
-      xs
-    } else {
-      let n = n - 1
-      let xs = builtin.tail_list(xs)
-      if n == 0 {
-        xs
-      } else {
-        builtin.tail_list(xs)
-      }
-    }
-  }
-}
-
-/// Borrowed from MicroProof's Bullet:
-/// https://github.com/utxo-company/bullet/blob/92d0b4aea1296407fff58cd129705ce67b407dd9/lib/macros.ak#L124-L135
-fn optimized_drop_n(xs: List<a>, n: Int) -> List<a> {
-  if n < 4 {
-    optimized_drop_n_helper(xs, n)
-  } else {
-    xs
-      |> builtin.tail_list
-      |> builtin.tail_list
-      |> builtin.tail_list
-      |> builtin.tail_list
-      |> optimized_drop_n(n - 4)
-  }
 }
 
 pub fn enforce_n_spend_redeemers(
