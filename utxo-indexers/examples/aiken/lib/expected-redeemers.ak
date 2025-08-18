@@ -1,17 +1,9 @@
 use aiken/builtin
 use cardano/transaction.{Redeemer, ScriptPurpose}
 
-/// We know the `Spend` constructor of `ScriptPurpose` has a tag of `1` based on
-/// its definition:
-/// ```aiken
-/// pub type ScriptPurpose {
-///   Mint(PolicyId)         // -> 0
-///   Spend(OutputReference) // -> 1
-///   Withdraw(Credential)   // -> 2
-///   Publish { at: Index, certificate: Certificate }
-///   Vote(Voter)
-///   Propose { at: Index, proposal_procedure: ProposalProcedure }
-/// }
+/// We know the `Spend` constructor of `ScriptPurpose` has a tag of `0` based
+/// on:
+/// https://github.com/IntersectMBO/cardano-ledger/blob/693218df6cd90263da24e6c2118bac420ceea3a1/eras/conway/impl/cddl-files/conway.cddl#L693-L699
 fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
   builtin.unconstr_index(script_purpose) != 0
 }
