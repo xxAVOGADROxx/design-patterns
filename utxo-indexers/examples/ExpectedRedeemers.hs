@@ -13,13 +13,13 @@ enforceNSpendRedeemersSkipFirst n b = isLastSpend (dropN (n - 1) (BI.unsafeDataA
     dropN i xs = dropN (i - 1) (BI.tail xs)
 
     isNonSpend :: BuiltinData -> Bool
-    isNonSpend red = BI.fst (BI.unsafeDataAsConstr (BI.fst $ BI.unsafeDataAsConstr red)) /= 1
+    isNonSpend red = BI.fst (BI.unsafeDataAsConstr (BI.fst $ BI.unsafeDataAsConstr red)) /= 0
 
     isLastSpend :: BI.BuiltinList (BI.BuiltinPair BI.BuiltinData BI.BuiltinData) -> Bool
     isLastSpend redeemers =
       let constrPair = BI.fst $ BI.head redeemers
           constrIdx = BI.fst (BI.unsafeDataAsConstr constrPair)
-       in if constrIdx == 1
+       in if constrIdx == 0
           then go (BI.tail redeemers)
           else False
 
@@ -33,7 +33,7 @@ enforceNSpendRedeemersSkipFirst n b = isLastSpend (dropN (n - 1) (BI.unsafeDataA
 penforceNSpendRedeemers :: forall {s :: S}. Term s PInteger -> Term s (AssocMap.PMap 'AssocMap.Unsorted PScriptPurpose PRedeemer) -> Term s PBool
 penforceNSpendRedeemers n rdmrs =
     let isNonSpend :: Term _ (PAsData PScriptPurpose) -> Term _ PBool
-        isNonSpend red = pnot # (pfstBuiltin # (pasConstr # (pforgetData red)) #== 1)
+        isNonSpend red = pnot # (pfstBuiltin # (pasConstr # (pforgetData red)) #== 0)
              
         isLastSpend :: Term _ (PBuiltinList (PBuiltinPair (PAsData PScriptPurpose) (PAsData PRedeemer)) :--> PBool)
         isLastSpend = plam $ \redeemers -> 
@@ -41,7 +41,7 @@ penforceNSpendRedeemers n rdmrs =
               constrPair = pfstBuiltin # (phead # redeemers)
               constrIdx = pfstBuiltin # (pasConstr # (pforgetData constrPair))
            in pif 
-                (constrIdx #== 1) 
+                (constrIdx #== 0)
                 (pelimList (\x _ -> isNonSpend (pfstBuiltin # x)) (pconstant True) (ptail # redeemers))
                 perror
      in isLastSpend # (pdropFast # (n - 1) # (pto rdmrs))
