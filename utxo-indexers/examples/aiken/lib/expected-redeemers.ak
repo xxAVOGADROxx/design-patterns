@@ -1,5 +1,5 @@
 use aiken/builtin
-use cardano/transaction.{Redeemer, ScriptPurpose, Spend}
+use cardano/transaction.{Mint, OutputReference, Redeemer, ScriptPurpose, Spend}
 use utils.{optimized_drop_n}
 
 pub fn enforce_n_spend_redeemers(
@@ -33,16 +33,29 @@ pub fn enforce_n_spend_redeemers(
   }
 }
 
-/// We know the `Spend` constructor of `ScriptPurpose` has a tag of `0` based
-/// on:
-/// https://github.com/IntersectMBO/cardano-ledger/blob/693218df6cd90263da24e6c2118bac420ceea3a1/eras/conway/impl/cddl-files/conway.cddl#L693-L699
+/// We know the `Spend` constructor of `ScriptPurpose` has a tag of `1` based
+/// on its definition:
+/// ```aiken
+/// pub type ScriptPurpose {
+///   Mint(PolicyId)         // --> 0
+///   Spend(OutputReference) // --> 1
+///   Withdraw(Credential)   // --> 2
+///   Publish { at: Index, certificate: Certificate }
+///   Vote(Voter)
+///   Propose { at: Index, proposal_procedure: ProposalProcedure }
+/// }
+/// ```
 fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
-  builtin.unconstr_index(script_purpose) != 0
+  builtin.unconstr_index(script_purpose) != 1
 }
 
 /// Useful approach when working inside the `else` branch of a validator where
 /// `redeemers` field is accessed as a `Data` (the `Pairs` phantom type is only
 /// included for better readability and has no impact on the logic/performance).
+///
+/// While the test below shows this function as more costly, it is of note that
+/// Aiken does perform implicit coercions in other branches of validators, which
+/// are not reflected here.
 pub fn enforce_n_spend_redeemers_from_data(
   redeemers_data: Data<Pairs<ScriptPurpose, Redeemer>>,
   n: Int,
@@ -61,4 +74,27 @@ pub fn enforce_n_spend_redeemers_from_data(
     !is_non_spend(last_spend.1st),
     is_non_spend(first_non_spend.1st),
   }
+}
+
+const mock_out_ref: OutputReference =
+  OutputReference { transaction_id: #"", output_index: 0 }
+
+const x: Pairs<ScriptPurpose, Redeemer> =
+  [
+    Pair(Spend(mock_out_ref), builtin.i_data(0)),
+    Pair(Spend(mock_out_ref), builtin.i_data(0)),
+    Pair(Spend(mock_out_ref), builtin.i_data(0)),
+    Pair(Spend(mock_out_ref), builtin.i_data(0)),
+    Pair(Mint(#""), builtin.i_data(0)),
+    Pair(Mint(#""), builtin.i_data(0)),
+  ]
+
+const x_data: Data = x
+
+test success__enforce_n_spend_redeemers() {
+  enforce_n_spend_redeemers(x, 4)
+}
+
+test success__enforce_n_spend_redeemers_data() {
+  enforce_n_spend_redeemers_from_data(x_data, 4)
 }
