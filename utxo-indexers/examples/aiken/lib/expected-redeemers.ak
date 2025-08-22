@@ -56,7 +56,7 @@ fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
 ///
 /// While the test below shows this function as more costly, it is of note that
 /// Aiken does perform implicit coercions in other branches of validators, which
-/// are not reflected in the test above.
+/// are not reflected in the test.
 pub fn enforce_n_spend_redeemers_from_data(
   redeemers_data: Data<Pairs<ScriptPurpose, Redeemer>>,
   n: Int,
