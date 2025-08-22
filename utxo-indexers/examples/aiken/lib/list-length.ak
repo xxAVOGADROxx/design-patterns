@@ -3,8 +3,9 @@ use utils.{optimized_drop_n}
 
 /// Note that with lists smaller than 4 elements the overhead thwarts the
 /// benefits.
-pub fn validate_list_length(xs: List<a>, expected_length: Int) -> Bool {
-  optimized_drop_n(xs, expected_length) == []
+pub fn list_length_fast(xs: List<a>, expected_length: Int) -> Int {
+  expect optimized_drop_n(xs, expected_length) == []
+  expected_length
 }
 
 const x =
@@ -19,14 +20,14 @@ test success__stdlib__26() {
   list.length(x) == 26
 }
 
-test success__validate_list_length__26() {
-  validate_list_length(x, 26)
+test success__list_length_fast__26() {
+  list_length_fast(x, 26) == 26
 }
 
 test success__stdlib__3() {
   list.length(y) == 3
 }
 
-test success__validate_list_length__3() {
-  validate_list_length(y, 3)
+test success__list_length_fast__3() {
+  list_length_fast(y, 3) == 3
 }

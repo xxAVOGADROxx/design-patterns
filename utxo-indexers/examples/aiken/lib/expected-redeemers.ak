@@ -7,10 +7,11 @@ pub fn enforce_n_spend_redeemers(
   n: Int,
 ) -> Bool {
   // We know all `Spend` purposes are at the start of the `redeemers` list (as
-  // it's ordered by the redeemer tags, and `Spend` has the smallest), so by
-  // dropping `n - 1` first elements of it, we can validate that the head of the
-  // remaining list **is** a `Spend`, and the head of its tail **is not** a
-  // `Spend`.
+  // it's ordered by the **ledger** redeemer tags, and `Spend` has the smallest,
+  // defined [here](https://github.com/IntersectMBO/cardano-ledger/blob/02212d86ac2ba6300a2ed53989140bb8f54b7fc9/eras/conway/impl/cddl-files/conway.cddl#L693-L699])),
+  // so by dropping `n - 1` first elements of it, we can validate that the head
+  // of the remaining list **is** a `Spend`, and the head of its tail **is not**
+  // a `Spend`.
   let last_spend_at_head = redeemers |> optimized_drop_n(n - 1)
 
   // The redeemer pair that we expect to be the last `Spend`.
@@ -55,7 +56,7 @@ fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
 ///
 /// While the test below shows this function as more costly, it is of note that
 /// Aiken does perform implicit coercions in other branches of validators, which
-/// are not reflected here.
+/// are not reflected in the test above.
 pub fn enforce_n_spend_redeemers_from_data(
   redeemers_data: Data<Pairs<ScriptPurpose, Redeemer>>,
   n: Int,
