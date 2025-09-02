@@ -23,7 +23,7 @@ builtinListLength acc xs =
     -- if the list is empty we return `acc` 
     acc
     -- if the list is non-empty we increase the counter and recurse
-    (\_ ys -> go (acc + 1) ys)
+    (\_ ys -> builtinListLength (acc + 1) ys)
 
 -- An efficient length function that takes as a parameter the expected length and uses that knowledge
 -- to avoid unnecessary recursion and checks. 
