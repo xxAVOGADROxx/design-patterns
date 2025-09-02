@@ -64,6 +64,8 @@ countSpendRedeemersSkipFirst b = go (BI.tail $ BI.unsafeDataAsMap b) 0
 ```
 As an exercise in this design pattern, try to design a variant of this function that takes as an argument the expected number of `Spend` redeemers (computed offchain and passed to the onchain code via the redeemer), and use it to efficiently compute the actual number of `Spend` redeemers (erroring if the actual differs from the expected).
 
+See [ExpectedRedeemers.hs](examples/ExpectedRedeemers.hs) for one possible solution. 
+
 ## Singular Input Processing
 
 The foundational concept of smart contract validation in Cardano begins with singular input
@@ -102,7 +104,7 @@ validatorA datum redeemer context =
         find (\TxInInfo{txInInfoOutRef} -> txInInfoOutRef == txOutRef) txInfoInputs
     findOwnInput _ = Nothing
 ```
-Note that `findOwnInput` checks the `TxOutRef` of each input to identify the one currently being validated. In this case, the check (comparing `TxOutRef`) is relatively cheap, even so, the actual search is very expensive since in the worst-case we traverse the entire list of inputs and check each one. Furthermore, often you will want to search for an input / output with more complex criteria ie:
+Note that `findOwnInput` checks the `TxOutRef` of each input to identify the one currently being validated. In this case, the check (comparing `TxOutRef`) is relatively cheap, even so, the actual search is very expensive since in the worst-case we traverse the entire list of inputs, decode them, and check each one. Furthermore, often you will want to search for an input / output with more complex criteria ie:
 
 ```haskell
 validatorB :: AssetClass -> BuiltinData -> BuiltinData -> ScriptContext -> Bool
@@ -126,6 +128,35 @@ validatorA :: AssetClass -> BuiltinData -> Integer -> ScriptContext -> Bool
 validatorA stateToken _ tkIdx ctx =
   assetClassValueOf stateToken (txInInfoResolved (elemAt tkIdx (txInfoInputs (txInfo ctx)))) == 1  
 ```
+
+Note that the above still performs some recursion, as the Plinth standard library implementation of `elemAt` is implemented quite naively. While it will still be significantly faster than a non-indexing approach as is, it can be improved even further by using an expanded variant of `elemAt`. 
+
+```haskell
+{-# INLINE elemAt' #-}
+elemAt' :: Integer -> BI.BuiltinList a -> a
+elemAt' !n xs =
+  BI.ifThenElse (BI.equalsInteger n 0)
+  (\_ -> BI.head xs)
+  (\_ -> elemAt' (n - 1) (BI.tail xs))
+  BI.unitval
+
+{-# INLINE elemAtFast #-}
+elemAtFast :: Integer -> BI.BuiltinList a -> a
+elemAtFast !n xs =
+  BI.ifThenElse (BI.lessThanInteger 10 n)
+  (\_ -> elemAtFast (n - 10) (BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail xs))
+  (\_ -> elemAtFast2 n xs)
+  BI.unitval
+
+{-# INLINE elemAtFast2 #-}
+elemAtFast2 :: Integer -> BI.BuiltinList a -> a
+elemAtFast2 !n xs =
+  BI.ifThenElse (BI.lessThanInteger 5 n)
+  (\_ -> elemAtFast2 (n - 5) (BI.tail $ BI.tail $ BI.tail $ BI.tail $ BI.tail xs))
+  (\_ -> elemAt' n xs)
+  BI.unitval
+```
+
 
 This design pattern can complicate the construction of the redeemer in off-chain code because the input index (corresponding to a given UTxO) that you define in the redeemer often will not index the correct UTxO after balancing / coin-selection since new inputs will be added to the transaction. Luckily [lucid-evolution](https://github.com/Anastasia-Labs/lucid-evolution) provides a high-level interface that abstracts all the complexity away and makes writing offchain code for this design pattern extremely simple! 
 
@@ -244,12 +275,16 @@ all the relevant inputs have been processed and validated against (when in actua
 processed and validated the same inputs multiple times thus allowing other inputs to be spent without being validated against).
 
 A common way to avoid this potential attack vector is to add checks to your onchain code to enforce that all the
-indices provided by the redeemer are unique (ie. there are no duplicates). Another way is to introduce checks 
-to your onchain code to enforce that the provided indices list is sorted and then instead of using `elemAt` (which
-gets the element at the provided index and discards the list of untraversed elements) you use a variant that
-keeps the untraversed elements and continues on to find the next element. In this solution you should provide the
-relative indices in the redeemer (the number of elements between the current element and the previous element) instead of 
-providing their absolute indexes.
+indices provided by the redeemer are unique (ie. there are no duplicates). This can be done extremely efficiently using a combination of two builtin functions, `writeBits` and `countSetBits`.
+
+```haskell
+-- | Check if a list of integers consists of only unique elements.
+-- Uses a bitmask to keep track of which elements have been seen.
+pisUniqueSet :: Term s (PInteger :--> PBuiltinList PInteger :--> PBool)
+pisUniqueSet = phoistAcyclic $ plam $ \n xs ->
+  let flagUniqueBits = pwriteBits' # emptyByteArray # xs # pconstant True
+  in (pcountSetBits' # flagUniqueBits #== (pbuiltinListLengthFast # n # xs))
+```
 
 ## Conclusion
 
