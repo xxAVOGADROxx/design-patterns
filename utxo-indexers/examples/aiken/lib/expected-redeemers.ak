@@ -17,20 +17,21 @@ pub fn enforce_n_spend_redeemers(
   // The redeemer pair that we expect to be the last `Spend`.
   let last_spend = last_spend_at_head |> builtin.head_list
 
-  // The list tail which we expect its head not to be a `Spend`.
+  // The list tail which we expect to be either empty, or its head be any script
+  // purpose other than `Spend`.
   let no_spends = last_spend_at_head |> builtin.tail_list
 
-  let first_non_spend = no_spends |> builtin.head_list
-
-  and {
-    when last_spend.1st is {
-      Spend(_) -> True
-      _ -> False
-    },
-    when first_non_spend.1st is {
-      Spend(_) -> False
-      _ -> True
-    },
+  when last_spend.1st is {
+    Spend(_) ->
+      when no_spends is {
+        [] -> True
+        [first_non_spend, ..] ->
+          when first_non_spend.1st is {
+            Spend(_) -> False
+            _ -> True
+          }
+      }
+    _ -> False
   }
 }
 
@@ -54,9 +55,9 @@ fn is_non_spend(script_purpose: Data<ScriptPurpose>) -> Bool {
 /// `redeemers` field is accessed as a `Data` (the `Pairs` phantom type is only
 /// included for better readability and has no impact on the logic/performance).
 ///
-/// While the test below shows this function as more costly, it is of note that
-/// Aiken does perform implicit coercions in other branches of validators, which
-/// are not reflected in the test.
+/// While the tests show this function as more costly, it is of note that Aiken
+/// does perform implicit coercions in other branches of validators, which are
+/// not reflected in the test.
 pub fn enforce_n_spend_redeemers_from_data(
   redeemers_data: Data<Pairs<ScriptPurpose, Redeemer>>,
   n: Int,
@@ -69,11 +70,13 @@ pub fn enforce_n_spend_redeemers_from_data(
 
   let no_spends = last_spend_at_head |> builtin.tail_list
 
-  let first_non_spend = no_spends |> builtin.head_list
-
-  and {
-    !is_non_spend(last_spend.1st),
-    is_non_spend(first_non_spend.1st),
+  if !is_non_spend(last_spend.1st) {
+    when no_spends is {
+      [] -> True
+      [first_non_spend, ..] -> is_non_spend(first_non_spend.1st)
+    }
+  } else {
+    False
   }
 }
 
